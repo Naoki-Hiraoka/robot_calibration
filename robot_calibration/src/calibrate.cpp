@@ -277,6 +277,7 @@ int main(int argc, char** argv)
 
   XmlRpc::XmlRpcValue::iterator it;
   size_t step;
+  std::vector<robot_calibration::OptimizationParams::FreeFrameInitialValue> inherited_frames;
   for(step = 0, it = cal_steps.begin(); step < (cal_steps.size()>0)?cal_steps.size():1; step++, it++){
     robot_calibration::OptimizationParams params;
     if(cal_steps.size()==0)
@@ -289,6 +290,7 @@ int main(int argc, char** argv)
         ros::NodeHandle cal_steps_handle(nh, "cal_steps/"+name);
         params.LoadFromROS(cal_steps_handle);
       }
+    params.free_frames_initial_values.insert(params.free_frames_initial_values.begin(), inherited_frames.begin(), inherited_frames.end());
     robot_calibration::Optimizer opt(description_msg.data);
     opt.optimize(params, data, verbose);
     if (verbose)
@@ -322,6 +324,41 @@ int main(int argc, char** argv)
                 data[i].observations[j].ext_camera_info.parameters[k].value = data[i].observations[j].ext_camera_info.parameters[k].value - opt.getOffsets()->get(data[i].observations[j].sensor_name+"_z_offset") * 1000; // (m -> mm)
               }
           }
+      }
+    }
+
+    inherited_frames.clear();
+    TiXmlDocument xml_doc;
+    xml_doc.Parse(s.c_str());
+    TiXmlElement *robot_xml = xml_doc.FirstChildElement("robot");
+    for(size_t i = 0; i < params.free_frames.size(); i++)
+    {
+      bool found = false;
+      for (TiXmlElement* joint_xml = robot_xml->FirstChildElement("joint"); joint_xml; joint_xml = joint_xml->NextSiblingElement("joint"))
+      {
+        std::string name = joint_xml->Attribute("name");
+        if (name == params.free_frames[i].name)
+        {
+          found = true;
+        }
+      }
+
+      if (!found)
+      {
+        KDL::Frame offset;
+        opt.getOffsets()->getFrame(params.free_frames[i].name, offset);
+        robot_calibration::OptimizationParams::FreeFrameInitialValue next_initialvalue;
+        next_initialvalue.name = params.free_frames[i].name;
+        next_initialvalue.x = offset.p.x();
+        next_initialvalue.y = offset.p.y();
+        next_initialvalue.z = offset.p.z();
+        std::vector<double> rpy(3, 0.0);
+        offset.M.GetRPY(rpy[0], rpy[1], rpy[2]);
+        next_initialvalue.roll = rpy[0];
+        next_initialvalue.pitch = rpy[1];
+        next_initialvalue.yaw = rpy[2];
+
+        inherited_frames.push_back(next_initialvalue);
       }
     }
 
