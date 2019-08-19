@@ -213,15 +213,24 @@ int main(int argc, char** argv)
       else
       {
         // Capture only the intended features for this sample
-        for (size_t i = 0; i < poses[pose_idx].features.size(); i++)
+        if (poses[pose_idx].features.size() > 0)
         {
-          std::string feature = poses[pose_idx].features[i];
-          if (!finders_[feature]->find(&msg))
+          for (size_t i = 0; i < poses[pose_idx].features.size(); i++)
           {
-            ROS_WARN("%s failed to capture features.", feature.c_str());
-            found_all_features = false;
-            break;
+            std::string feature = poses[pose_idx].features[i];
+            if (!finders_[feature]->find(&msg))
+            {
+              ROS_WARN("%s failed to capture features.", feature.c_str());
+              found_all_features = false;
+              break;
+            }
           }
+        }
+        else
+        {
+          ROS_INFO("Skip capturing features. Press Enter key ...");
+          std::string throwaway;
+          std::getline(std::cin, throwaway);
         }
       }
 
