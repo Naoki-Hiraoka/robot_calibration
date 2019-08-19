@@ -286,9 +286,10 @@ int main(int argc, char** argv)
 
   XmlRpc::XmlRpcValue::iterator it;
   size_t step;
+  size_t max_step = (cal_steps.size()>0)?cal_steps.size():1;
   std::vector<robot_calibration::OptimizationParams::FreeFrameInitialValue> inherited_frames;
   std::vector<std::string> frame_names;
-  for(step = 0, it = cal_steps.begin(); step < (cal_steps.size()>0)?cal_steps.size():1; step++, it++){
+  for(step = 0, it = cal_steps.begin(); step < max_step; step++, it++){
     robot_calibration::OptimizationParams params;
     if(cal_steps.size()==0)
       {
@@ -384,7 +385,7 @@ int main(int argc, char** argv)
       }
     }
 
-    if(step == (cal_steps.size()>0)?(cal_steps.size()-1):0){
+    if(step == max_step - 1){
       // Generate datecode
       char datecode[80];
       {
