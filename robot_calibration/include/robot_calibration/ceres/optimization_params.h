@@ -61,6 +61,7 @@ struct OptimizationParams
   std::vector<std::string> free_params;
   std::vector<FreeFrameParams> free_frames;
   std::vector<FreeFrameInitialValue> free_frames_initial_values;
+  std::vector<std::string> const_frames;
   std::vector<Params> models;
   std::vector<Params> error_blocks;
 

@@ -278,6 +278,7 @@ int main(int argc, char** argv)
   XmlRpc::XmlRpcValue::iterator it;
   size_t step;
   std::vector<robot_calibration::OptimizationParams::FreeFrameInitialValue> inherited_frames;
+  std::vector<std::string> frame_names;
   for(step = 0, it = cal_steps.begin(); step < (cal_steps.size()>0)?cal_steps.size():1; step++, it++){
     robot_calibration::OptimizationParams params;
     if(cal_steps.size()==0)
@@ -290,6 +291,7 @@ int main(int argc, char** argv)
         ros::NodeHandle cal_steps_handle(nh, "cal_steps/"+name);
         params.LoadFromROS(cal_steps_handle);
       }
+    params.const_frames = frame_names;
     params.free_frames_initial_values.insert(params.free_frames_initial_values.begin(), inherited_frames.begin(), inherited_frames.end());
     robot_calibration::Optimizer opt(description_msg.data);
     opt.optimize(params, data, verbose);
@@ -327,7 +329,6 @@ int main(int argc, char** argv)
       }
     }
 
-    inherited_frames.clear();
     TiXmlDocument xml_doc;
     xml_doc.Parse(s.c_str());
     TiXmlElement *robot_xml = xml_doc.FirstChildElement("robot");
@@ -358,7 +359,19 @@ int main(int argc, char** argv)
         next_initialvalue.pitch = rpy[1];
         next_initialvalue.yaw = rpy[2];
 
-        inherited_frames.push_back(next_initialvalue);
+        size_t idx;
+        for (idx = 0; idx < frame_names.size(); idx++){
+          if (frame_names[idx] == next_initialvalue.name) break;
+        }
+        if( idx == frame_names.size() )
+        {
+          frame_names.push_back(next_initialvalue.name);
+          inherited_frames.push_back(next_initialvalue);
+        }
+        else
+        {
+          inherited_frames[idx] = next_initialvalue;
+        }
       }
     }
 

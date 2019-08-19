@@ -41,6 +41,13 @@ bool CalibrationOffsetParser::add(const std::string name)
   return true;
 }
 
+bool CalibrationOffsetParser::addConst(const std::string name)
+{
+  const_parameter_names_.push_back(name);
+  const_parameter_offsets_.push_back(0.0);
+  return true;
+}
+
 bool CalibrationOffsetParser::addFrame(
     const std::string name,
     bool calibrate_x, bool calibrate_y, bool calibrate_z,
@@ -66,6 +73,20 @@ bool CalibrationOffsetParser::addFrame(
   return true;
 }
 
+bool CalibrationOffsetParser::addFrameConst(const std::string name)
+{
+  frame_names_.push_back(name);
+  addConst(std::string(name).append("_x"));
+  addConst(std::string(name).append("_y"));
+  addConst(std::string(name).append("_z"));
+
+  addConst(std::string(name).append("_a"));
+  addConst(std::string(name).append("_b"));
+  addConst(std::string(name).append("_c"));
+
+  return true;
+}
+
 bool CalibrationOffsetParser::set(const std::string name, double value)
 {
   for (size_t i = 0; i < parameter_names_.size(); ++i)
@@ -73,6 +94,14 @@ bool CalibrationOffsetParser::set(const std::string name, double value)
     if (parameter_names_[i] == name)
     {
       parameter_offsets_[i] = value;
+      return true;
+    }
+  }
+  for (size_t i = 0; i < const_parameter_names_.size(); ++i)
+  {
+    if (const_parameter_names_[i] == name)
+    {
+      const_parameter_offsets_[i] = value;
       return true;
     }
   }
@@ -120,6 +149,11 @@ double CalibrationOffsetParser::get(const std::string name) const
   {
     if (parameter_names_[i] == name)
       return parameter_offsets_[i];
+  }
+  for (size_t i = 0; i < const_parameter_names_.size(); ++i)
+  {
+    if (const_parameter_names_[i] == name)
+      return const_parameter_offsets_[i];
   }
   // Not calibrating this
   return 0.0;
