@@ -287,8 +287,8 @@ int main(int argc, char** argv)
   XmlRpc::XmlRpcValue::iterator it;
   size_t step;
   size_t max_step = (cal_steps.size()>0)?cal_steps.size():1;
-  std::vector<robot_calibration::OptimizationParams::FreeFrameInitialValue> inherited_frames;
-  std::vector<std::string> frame_names;
+  std::vector<std::string> prev_frame_names;
+  std::string prev_params_yaml;
   for(step = 0, it = cal_steps.begin(); step < max_step; step++, it++){
     robot_calibration::OptimizationParams params;
     if(cal_steps.size()==0)
@@ -301,8 +301,7 @@ int main(int argc, char** argv)
         ros::NodeHandle cal_steps_handle(nh, "cal_steps/"+name);
         params.LoadFromROS(cal_steps_handle);
       }
-    params.const_frames = frame_names;
-    params.free_frames_initial_values.insert(params.free_frames_initial_values.begin(), inherited_frames.begin(), inherited_frames.end());
+    params.LoadPrevValues(prev_frame_names,prev_params_yaml);
     robot_calibration::Optimizer opt(description_msg.data);
     opt.optimize(params, data, verbose);
     if (verbose)
@@ -311,79 +310,9 @@ int main(int argc, char** argv)
         std::cout << opt.getOffsets()->getOffsetYAML() << std::endl;
       }
 
-    // Update the URDF
-    std::string s = opt.getOffsets()->updateURDF(description_msg.data);
-    description_msg.data = s;
-
-    // Update camera calibration
-    for(size_t i = 0; i < data.size(); i++){
-      for(size_t j = 0; j < data[i].observations.size(); j++){
-        data[i].observations[j].ext_camera_info.camera_info =
-          robot_calibration::updateCameraInfo(opt.getOffsets()->get(data[i].observations[j].sensor_name+"_fx"),
-                                              opt.getOffsets()->get(data[i].observations[j].sensor_name+"_fy"),
-                                              opt.getOffsets()->get(data[i].observations[j].sensor_name+"_cx"),
-                                              opt.getOffsets()->get(data[i].observations[j].sensor_name+"_cy"),
-                                              data[i].observations[j].ext_camera_info.camera_info);
-        for (size_t k = 0; k < data[i].observations[j].ext_camera_info.parameters.size(); k++)
-          {
-            if (data[i].observations[j].ext_camera_info.parameters[k].name == "z_scaling")
-              {
-                data[i].observations[j].ext_camera_info.parameters[k].value
-                  = data[i].observations[j].ext_camera_info.parameters[k].value / (1.0 +  opt.getOffsets()->get(data[i].observations[j].sensor_name+"_z_scaling"));
-              }
-            else if (data[i].observations[j].ext_camera_info.parameters[k].name == "z_offset_mm")
-              {
-                data[i].observations[j].ext_camera_info.parameters[k].value = data[i].observations[j].ext_camera_info.parameters[k].value - opt.getOffsets()->get(data[i].observations[j].sensor_name+"_z_offset") * 1000; // (m -> mm)
-              }
-          }
-      }
-    }
-
-    TiXmlDocument xml_doc;
-    xml_doc.Parse(s.c_str());
-    TiXmlElement *robot_xml = xml_doc.FirstChildElement("robot");
-    for(size_t i = 0; i < params.free_frames.size(); i++)
-    {
-      bool found = false;
-      for (TiXmlElement* joint_xml = robot_xml->FirstChildElement("joint"); joint_xml; joint_xml = joint_xml->NextSiblingElement("joint"))
-      {
-        std::string name = joint_xml->Attribute("name");
-        if (name == params.free_frames[i].name)
-        {
-          found = true;
-        }
-      }
-
-      if (!found)
-      {
-        KDL::Frame offset;
-        opt.getOffsets()->getFrame(params.free_frames[i].name, offset);
-        robot_calibration::OptimizationParams::FreeFrameInitialValue next_initialvalue;
-        next_initialvalue.name = params.free_frames[i].name;
-        next_initialvalue.x = offset.p.x();
-        next_initialvalue.y = offset.p.y();
-        next_initialvalue.z = offset.p.z();
-        std::vector<double> rpy(3, 0.0);
-        offset.M.GetRPY(rpy[0], rpy[1], rpy[2]);
-        next_initialvalue.roll = rpy[0];
-        next_initialvalue.pitch = rpy[1];
-        next_initialvalue.yaw = rpy[2];
-
-        size_t idx;
-        for (idx = 0; idx < frame_names.size(); idx++){
-          if (frame_names[idx] == next_initialvalue.name) break;
-        }
-        if( idx == frame_names.size() )
-        {
-          frame_names.push_back(next_initialvalue.name);
-          inherited_frames.push_back(next_initialvalue);
-        }
-        else
-        {
-          inherited_frames[idx] = next_initialvalue;
-        }
-      }
-    }
+    // get params for next step
+    prev_frame_names = opt.getOffsets()->getFrameNames();
+    prev_params_yaml = opt.getOffsets()->getOffsetYAML();
 
     if(step == max_step - 1){
       // Generate datecode
@@ -395,6 +324,7 @@ int main(int argc, char** argv)
 
       // Save updated URDF
       {
+        std::string s = opt.getOffsets()->updateURDF(description_msg.data);
         std::stringstream urdf_name;
         urdf_name << "/tmp/calibrated_" << datecode << ".urdf";
         std::ofstream file;

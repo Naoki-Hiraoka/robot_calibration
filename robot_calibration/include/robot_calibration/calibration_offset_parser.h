@@ -52,7 +52,7 @@ public:
                 bool calibrate_x, bool calibrate_y, bool calibrate_z,
                 bool calibrate_roll, bool calibrate_pitch, bool calibrate_yaw);
 
-  bool addFrameConst(const std::string name);
+  bool addFrameNameConst(const std::string name);
 
   /**
    *  \brief Set the values for a single parameter.
@@ -88,8 +88,14 @@ public:
   /** \returns The number of free parameters being parsed */
   int size();
 
+  /** \returns frame_names */
+  std::vector<std::string> getFrameNames() const;
+
   /** \brief Load all the current offsets from a YAML */
   bool loadOffsetYAML(const std::string& filename);
+
+  /** \brief Load all the current offsets from a YAML */
+  bool loadOffsetYAMLfromString(const std::string& yaml);
 
   /** \brief Get all the current offsets as a YAML */
   std::string getOffsetYAML();
