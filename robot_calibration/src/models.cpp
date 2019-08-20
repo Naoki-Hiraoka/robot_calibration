@@ -136,8 +136,8 @@ KDL::Frame ChainModel::getChainFK(const CalibrationOffsetParser& offsets,
 
     KDL::Frame totip = chain_.getSegment(i).getFrameToTip();
 
-    // Apply any frame calibration
-    p_out = p_out * KDL::Frame(pose.p + correction.p);
+    // Apply any frame calibration on the joint <origin> frame
+    p_out = p_out * KDL::Frame(pose.p + totip.M * correction.p);
     p_out = p_out * KDL::Frame(totip.M * correction.M * totip.M.Inverse() * pose.M);
 
   }
